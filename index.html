@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Cartographer — генератор векторных карт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <button id="compass" class="compass" title="Сгенерировать новую карту" aria-label="Сгенерировать новую карту">
+        <svg viewBox="0 0 100 100" class="compass-svg">
+          <circle cx="50" cy="50" r="46" class="compass-ring"/>
+          <circle cx="50" cy="50" r="38" class="compass-ring-inner"/>
+          <path d="M50 8 L58 50 L50 92 L42 50 Z" class="compass-needle-n"/>
+          <path d="M8 50 L50 42 L92 50 L50 58 Z" class="compass-needle-e"/>
+          <circle cx="50" cy="50" r="4" class="compass-hub"/>
+        </svg>
+      </button>
+      <div class="brand-text">
+        <h1>Cartographer</h1>
+        <p>генератор векторных карт земли</p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="btnPanelLeft" class="btn btn-icon-mobile" title="Генерация">⚙</button>
+      <button id="btnGenerate" class="btn btn-primary">Сгенерировать</button>
+      <button id="btnExportPng" class="btn">Экспорт PNG</button>
+      <button id="btnSave" class="btn">Сохранить .json</button>
+      <button id="btnLoad" class="btn">Загрузить</button>
+      <button id="btnPanelRight" class="btn btn-icon-mobile" title="Слои">▤</button>
+      <input type="file" id="fileLoad" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+  <aside class="panel panel-left" id="panelLeft">
+    <button class="panel-close" data-close-panel aria-label="Закрыть панель">✕</button>
+    <section class="panel-section">
+      <h2>Генерация</h2>
+
+      <label class="field">
+        <span>Сид карты</span>
+        <div class="seed-row">
+          <input type="text" id="seed" value="astrakhan-01">
+          <button id="btnDice" class="icon-btn" title="Случайный сид">🎲</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Размер сетки</span>
+        <select id="mapSize">
+          <option value="small">Малая (100×60)</option>
+          <option value="medium" selected>Средняя (160×96)</option>
+          <option value="large">Большая (220×132)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Количество островов <output id="islandCountOut">4</output></span>
+        <input type="range" id="islandCount" min="1" max="10" value="4" step="1">
+      </label>
+
+      <label class="field">
+        <span>Размер островов <output id="islandSizeOut">0.5</output></span>
+        <input type="range" id="islandSize" min="0.1" max="1" value="0.5" step="0.05">
+      </label>
+
+      <label class="field">
+        <span>Шероховатость рельефа <output id="roughnessOut">0.5</output></span>
+        <input type="range" id="roughness" min="0" max="1" value="0.5" step="0.05">
+      </label>
+
+      <label class="field">
+        <span>Уровень моря <output id="seaLevelOut">0.34</output></span>
+        <input type="range" id="seaLevel" min="0.1" max="0.6" value="0.34" step="0.02">
+      </label>
+    </section>
+
+    <section class="panel-section">
+      <h2>Палитра</h2>
+      <div id="paletteGrid" class="palette-grid"></div>
+    </section>
+  </aside>
+
+  <main class="stage-wrap">
+    <div class="toolbar">
+      <div class="tool-group" id="toolGroup">
+        <button class="tool-btn active" data-tool="pan" title="Перемещение">✥</button>
+        <button class="tool-btn" data-tool="raise" title="Поднять рельеф">⛰</button>
+        <button class="tool-btn" data-tool="lower" title="Опустить рельеф">🌊</button>
+        <button class="tool-btn" data-tool="paint" title="Закрасить биом">🖌</button>
+        <button class="tool-btn" data-tool="erase" title="Стереть правку">⌫</button>
+      </div>
+
+      <label class="field field-inline">
+        <span>Кисть</span>
+        <input type="range" id="brushSize" min="1" max="16" value="4" step="1">
+      </label>
+
+      <label class="field field-inline">
+        <span>Сила</span>
+        <input type="range" id="brushStrength" min="0.01" max="0.2" value="0.06" step="0.01">
+      </label>
+
+      <div class="paint-band-row" id="paintBandRow">
+        <span>Тип:</span>
+        <select id="paintBand">
+          <option value="1">Мель</option>
+          <option value="2">Песок</option>
+          <option value="3" selected>Трава светлая</option>
+          <option value="4">Трава</option>
+          <option value="5">Трава тёмная</option>
+          <option value="6">Холмы</option>
+          <option value="7">Горы</option>
+          <option value="8">Пик</option>
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <button id="btnZoomOut" class="tool-btn" title="Отдалить">−</button>
+        <button id="btnZoomIn" class="tool-btn" title="Приблизить">+</button>
+      </div>
+
+      <button id="btnResetView" class="btn btn-ghost">Сбросить вид</button>
+    </div>
+
+    <div class="viewport" id="viewport">
+      <div class="stage" id="stage">
+        <canvas id="layerTerrain"></canvas>
+        <canvas id="layerRelief"></canvas>
+        <canvas id="layerRivers"></canvas>
+        <canvas id="layerGrid"></canvas>
+        <canvas id="layerLabels"></canvas>
+        <canvas id="layerOverlay"></canvas>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <span id="statusSeed">seed: —</span>
+      <span id="statusSize">размер: —</span>
+      <span id="statusIslands">суша: —</span>
+      <span class="status-hint">колесо / щипок — зум · shift+drag / средняя кнопка / палец — панорама</span>
+    </div>
+  </main>
+
+  <aside class="panel panel-right" id="panelRight">
+    <button class="panel-close" data-close-panel aria-label="Закрыть панель">✕</button>
+    <section class="panel-section">
+      <h2>Слои</h2>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="terrain" checked>
+        <span>Ландшафт</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="relief" checked>
+        <span>Рельефные штрихи</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="rivers" checked>
+        <span>Реки</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="grid">
+        <span>Координатная сетка</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="labels" checked>
+        <span>Названия земель</span>
+      </label>
+    </section>
+
+    <section class="panel-section">
+      <h2>О проекте</h2>
+      <p class="about-text">
+        Векторно-пиксельная карта генерируется из шума высот и масок островов,
+        затем делится на биомы. Рельеф можно редактировать кистью прямо на холсте —
+        поднимать сушу, топить её или закрашивать тип местности вручную.
+      </p>
+    </section>
+  </aside>
+
+</div>
+
+<script src="noise.js"></script>
+<script src="mapgen.js"></script>
+<script src="render.js"></script>
+<script src="editor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
